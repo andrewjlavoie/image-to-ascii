@@ -11,6 +11,7 @@ import numpy as np
 from ascii_bg.core.character_sets import CharacterSet
 from ascii_bg.core.color_handler import ColorHandler, ColorMode
 from ascii_bg.core.image_processor import ImageProcessor
+from ascii_bg.core.renderer import ImageRenderer, JSONExporter
 
 
 class AsciiArt:
@@ -60,6 +61,37 @@ class AsciiArt:
             return self.to_plain_text()
 
         return self.color_handler.apply_colors(self.char_grid, self.color_grid)
+
+    def save_image(
+        self,
+        output_path: str | Path,
+        font_family: str = "DejaVuSansMono",
+        font_size: int = 10,
+        bg_color: tuple[int, int, int] = (0, 0, 0),
+    ) -> None:
+        """Save ASCII art as image file (PNG/JPG).
+
+        Args:
+            output_path: Path to save image file
+            font_family: Font family name (monospace recommended)
+            font_size: Font size in points
+            bg_color: Background color RGB tuple
+        """
+        renderer = ImageRenderer(font_family, font_size, bg_color)
+        renderer.render(self.char_grid, self.color_grid, output_path)
+
+    def save_json(
+        self,
+        output_path: str | Path,
+        metadata: dict | None = None,
+    ) -> None:
+        """Save ASCII art as JSON file for LLM processing.
+
+        Args:
+            output_path: Path to save JSON file
+            metadata: Optional metadata dict to include
+        """
+        JSONExporter.export(self.char_grid, self.color_grid, output_path, metadata)
 
     def __str__(self) -> str:
         """String representation (plain text)."""

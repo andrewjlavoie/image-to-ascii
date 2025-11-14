@@ -176,9 +176,7 @@ class TestCLI:
     ) -> None:
         """Test output to both file and terminal."""
         output_file = tmp_path / "output.txt"
-        result = cli_runner.invoke(
-            main, [str(test_image), "-o", str(output_file)]
-        )
+        result = cli_runner.invoke(main, [str(test_image), "-o", str(output_file)])
 
         assert result.exit_code == 0
         assert output_file.exists()

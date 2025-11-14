@@ -5,7 +5,7 @@ from pathlib import Path
 
 import click
 
-from ascii_bg.core import AsciiConverter
+from ascii_bg.core import AsciiConverter, ColorHandler, ColorMode, parse_color
 from ascii_bg.core.character_sets import CharacterSet
 
 
@@ -50,6 +50,34 @@ from ascii_bg.core.character_sets import CharacterSet
     help="Disable aspect ratio correction for terminal",
 )
 @click.option(
+    "--color-mode",
+    type=click.Choice(
+        ["black-white", "source", "rainbow", "gradient", "solid"], case_sensitive=False
+    ),
+    default="black-white",
+    help="Color mode (default: black-white)",
+    show_default=True,
+)
+@click.option(
+    "--gradient-colors",
+    help="Comma-separated color list for gradient mode (e.g., #FF0000,#0000FF,#00FF00)",
+)
+@click.option(
+    "--gradient-direction",
+    type=click.Choice(["horizontal", "vertical", "diagonal"], case_sensitive=False),
+    default="horizontal",
+    help="Gradient direction (default: horizontal)",
+    show_default=True,
+)
+@click.option(
+    "--text-color",
+    help="Text color for solid mode (hex #RRGGBB or name)",
+)
+@click.option(
+    "--bg-color",
+    help="Background color for solid mode (hex #RRGGBB or name)",
+)
+@click.option(
     "-o",
     "--output",
     type=click.Path(path_type=Path),
@@ -70,6 +98,11 @@ def main(
     contrast: int,
     invert: bool,
     no_aspect_correct: bool,
+    color_mode: str,
+    gradient_colors: str | None,
+    gradient_direction: str,
+    text_color: str | None,
+    bg_color: str | None,
     output: Path | None,
     terminal: bool,
 ) -> None:
@@ -81,10 +114,56 @@ def main(
         ascii-bg photo.png --resolution=4k --brightness=20
         ascii-bg input.jpg --charset=simple --invert
         ascii-bg image.jpg -r 1920x1080 --contrast=15 -o output.txt
+        ascii-bg image.jpg --color-mode=rainbow --gradient-direction=diagonal
+        ascii-bg photo.png --color-mode=gradient --gradient-colors=#FF0000,#00FF00,#0000FF
+        ascii-bg input.jpg --color-mode=solid --text-color=cyan --bg-color=black
     """
     try:
         # Create character set
         char_set = CharacterSet.from_preset(charset)
+
+        # Create color handler
+        mode = ColorMode(color_mode)
+        color_handler = None
+
+        if mode != ColorMode.BLACK_WHITE:
+            # Parse gradient colors if provided
+            gradient_color_list = None
+            if gradient_colors:
+                try:
+                    gradient_color_list = [
+                        parse_color(c.strip()) for c in gradient_colors.split(",")
+                    ]
+                except ValueError as e:
+                    click.echo(f"Error parsing gradient colors: {e}", err=True)
+                    sys.exit(1)
+
+            # Parse text and background colors if provided
+            text_color_rgb = None
+            bg_color_rgb = None
+
+            if text_color:
+                try:
+                    text_color_rgb = parse_color(text_color)
+                except ValueError as e:
+                    click.echo(f"Error parsing text color: {e}", err=True)
+                    sys.exit(1)
+
+            if bg_color:
+                try:
+                    bg_color_rgb = parse_color(bg_color)
+                except ValueError as e:
+                    click.echo(f"Error parsing background color: {e}", err=True)
+                    sys.exit(1)
+
+            # Create color handler
+            color_handler = ColorHandler(
+                mode=mode,
+                gradient_colors=gradient_color_list,
+                gradient_direction=gradient_direction,
+                text_color=text_color_rgb,
+                bg_color=bg_color_rgb,
+            )
 
         # Create converter
         converter = AsciiConverter(
@@ -94,6 +173,7 @@ def main(
             contrast=contrast,
             invert=invert,
             aspect_correct=not no_aspect_correct,
+            color_handler=color_handler,
         )
 
         # Convert image
@@ -102,13 +182,19 @@ def main(
 
         # Output results
         if terminal:
-            # Display in terminal (plain text for now)
-            click.echo(art.to_plain_text())
+            # Display in terminal (with color if enabled)
+            if mode != ColorMode.BLACK_WHITE:
+                click.echo(art.to_colored_text())
+            else:
+                click.echo(art.to_plain_text())
 
         if output:
             # Save to file
             click.echo(f"Saving to {output}...", err=True)
-            output.write_text(art.to_plain_text())
+            if mode != ColorMode.BLACK_WHITE:
+                output.write_text(art.to_colored_text())
+            else:
+                output.write_text(art.to_plain_text())
             click.echo(f"✓ Saved to {output}", err=True)
 
         # Success message

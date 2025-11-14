@@ -9,6 +9,7 @@ from pathlib import Path
 import numpy as np
 
 from ascii_bg.core.character_sets import CharacterSet
+from ascii_bg.core.color_handler import ColorHandler, ColorMode
 from ascii_bg.core.image_processor import ImageProcessor
 
 
@@ -24,6 +25,7 @@ class AsciiArt:
         color_grid: np.ndarray,
         width: int,
         height: int,
+        color_handler: ColorHandler | None = None,
     ) -> None:
         """Initialize ASCII art container.
 
@@ -32,11 +34,13 @@ class AsciiArt:
             color_grid: 3D numpy array of RGB colors (height, width, 3)
             width: Width in characters
             height: Height in characters
+            color_handler: Color handler for colored output
         """
         self.char_grid = char_grid
         self.color_grid = color_grid
         self.width = width
         self.height = height
+        self.color_handler = color_handler
 
     def to_plain_text(self) -> str:
         """Convert to plain text (no colors).
@@ -45,6 +49,17 @@ class AsciiArt:
             ASCII art as plain text string
         """
         return "\n".join("".join(row) for row in self.char_grid)
+
+    def to_colored_text(self) -> str:
+        """Convert to colored text with ANSI codes.
+
+        Returns:
+            ASCII art with ANSI color codes
+        """
+        if self.color_handler is None:
+            return self.to_plain_text()
+
+        return self.color_handler.apply_colors(self.char_grid, self.color_grid)
 
     def __str__(self) -> str:
         """String representation (plain text)."""
@@ -70,6 +85,7 @@ class AsciiConverter:
         contrast: int = 0,
         invert: bool = False,
         aspect_correct: bool = True,
+        color_handler: ColorHandler | None = None,
     ) -> None:
         """Initialize ASCII converter.
 
@@ -80,6 +96,7 @@ class AsciiConverter:
             contrast: Contrast adjustment (-100 to 100)
             invert: Invert character density (swap dark/light)
             aspect_correct: Apply aspect ratio correction for terminal display
+            color_handler: Color handler for colored output
         """
         # Parse resolution if string
         if isinstance(resolution, str):
@@ -106,6 +123,9 @@ class AsciiConverter:
             aspect_correct=aspect_correct,
         )
 
+        # Set up color handler
+        self.color_handler = color_handler
+
     def convert(self, image_path: str | Path) -> AsciiArt:
         """Convert image to ASCII art.
 
@@ -121,12 +141,51 @@ class AsciiConverter:
         # Convert to character grid
         char_grid = self._grayscale_to_chars(grayscale)
 
+        # Get actual dimensions (may differ due to aspect correction)
+        actual_height, actual_width = grayscale.shape
+
+        # Generate color grid based on color mode
+        color_grid = self._generate_color_grid(rgb, actual_width, actual_height)
+
         return AsciiArt(
             char_grid=char_grid,
-            color_grid=rgb,
+            color_grid=color_grid,
             width=self.resolution[0],
-            height=grayscale.shape[0],  # Use actual height after aspect correction
+            height=actual_height,
+            color_handler=self.color_handler,
         )
+
+    def _generate_color_grid(self, source_rgb: np.ndarray, width: int, height: int) -> np.ndarray:
+        """Generate color grid based on color mode.
+
+        Args:
+            source_rgb: Source image RGB array
+            width: Target width
+            height: Target height
+
+        Returns:
+            Color grid for output
+        """
+        if self.color_handler is None:
+            return source_rgb
+
+        mode = self.color_handler.mode
+
+        if mode == ColorMode.SOURCE:
+            # Use source image colors
+            return source_rgb
+        elif mode == ColorMode.RAINBOW:
+            # Generate rainbow gradient
+            return self.color_handler.generate_rainbow_gradient(width, height)
+        elif mode == ColorMode.GRADIENT:
+            # Generate custom gradient
+            return self.color_handler.generate_custom_gradient(width, height)
+        elif mode == ColorMode.SOLID:
+            # Generate solid color
+            return self.color_handler.generate_solid_colors(width, height)
+        else:
+            # BLACK_WHITE or unknown, use source
+            return source_rgb
 
     def _grayscale_to_chars(self, grayscale: np.ndarray) -> list[list[str]]:
         """Convert grayscale array to character grid.

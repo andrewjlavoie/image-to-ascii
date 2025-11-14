@@ -78,10 +78,43 @@ from ascii_bg.core.character_sets import CharacterSet
     help="Background color for solid mode (hex #RRGGBB or name)",
 )
 @click.option(
+    "--border",
+    type=click.Choice(["none", "simple"], case_sensitive=False),
+    default="none",
+    help="Border style (default: none)",
+    show_default=True,
+)
+@click.option(
+    "--border-char",
+    default="#",
+    help="Border character (default: #)",
+    show_default=True,
+)
+@click.option(
+    "--padding",
+    type=click.IntRange(0, 10),
+    default=0,
+    help="Padding size (0-10, default: 0)",
+    show_default=True,
+)
+@click.option(
     "-o",
     "--output",
     type=click.Path(path_type=Path),
-    help="Output file path (for future image/JSON export)",
+    help="Output file (PNG, JPG, JSON, or TXT)",
+)
+@click.option(
+    "--font-family",
+    default="DejaVuSansMono",
+    help="Font family for image output (default: DejaVuSansMono)",
+    show_default=True,
+)
+@click.option(
+    "--font-size",
+    type=click.IntRange(4, 72),
+    default=10,
+    help="Font size for image output (default: 10)",
+    show_default=True,
 )
 @click.option(
     "--terminal",
@@ -103,20 +136,37 @@ def main(
     gradient_direction: str,
     text_color: str | None,
     bg_color: str | None,
+    border: str,
+    border_char: str,
+    padding: int,
     output: Path | None,
+    font_family: str,
+    font_size: int,
     terminal: bool,
 ) -> None:
     """Convert IMAGE to ASCII art.
 
     \b
     Examples:
+        # Terminal output
         ascii-bg image.jpg
         ascii-bg photo.png --resolution=4k --brightness=20
-        ascii-bg input.jpg --charset=simple --invert
-        ascii-bg image.jpg -r 1920x1080 --contrast=15 -o output.txt
+
+        # Color modes
         ascii-bg image.jpg --color-mode=rainbow --gradient-direction=diagonal
         ascii-bg photo.png --color-mode=gradient --gradient-colors=#FF0000,#00FF00,#0000FF
         ascii-bg input.jpg --color-mode=solid --text-color=cyan --bg-color=black
+
+        # Save as PNG/JPG
+        ascii-bg image.jpg -o output.png --font-size=12
+        ascii-bg photo.png --color-mode=rainbow -o output.jpg --font-family=Courier
+
+        # Save as JSON (for LLM processing)
+        ascii-bg image.jpg -o output.json
+
+        # Borders and padding
+        ascii-bg image.jpg --border=simple --padding=2 -o output.png
+        ascii-bg photo.png --border=simple --border-char=* --padding=1
     """
     try:
         # Create character set
@@ -180,6 +230,18 @@ def main(
         click.echo(f"Converting {image.name}...", err=True)
         art = converter.convert(image)
 
+        # Apply border and padding if requested
+        if border != "none" or padding > 0:
+            from ascii_bg.core.renderer import add_border, add_border_to_colors
+
+            art.char_grid = add_border(art.char_grid, border_char, padding)
+            # For color grid, use white border for colored modes
+            border_color = (255, 255, 255) if mode != ColorMode.BLACK_WHITE else (128, 128, 128)
+            art.color_grid = add_border_to_colors(art.color_grid, border_color, padding)
+            # Update dimensions
+            art.height = len(art.char_grid)
+            art.width = len(art.char_grid[0]) if art.char_grid else 0
+
         # Output results
         if terminal:
             # Display in terminal (with color if enabled)
@@ -191,10 +253,30 @@ def main(
         if output:
             # Save to file
             click.echo(f"Saving to {output}...", err=True)
-            if mode != ColorMode.BLACK_WHITE:
-                output.write_text(art.to_colored_text())
+
+            # Detect format from extension
+            suffix = output.suffix.lower()
+
+            if suffix in [".png", ".jpg", ".jpeg"]:
+                # Save as image
+                bg = (0, 0, 0) if bg_color is None else parse_color(bg_color)
+                art.save_image(output, font_family, font_size, bg)
+            elif suffix == ".json":
+                # Save as JSON
+                metadata = {
+                    "source_image": str(image),
+                    "resolution": resolution,
+                    "charset": charset,
+                    "color_mode": color_mode,
+                }
+                art.save_json(output, metadata)
             else:
-                output.write_text(art.to_plain_text())
+                # Save as text file
+                if mode != ColorMode.BLACK_WHITE:
+                    output.write_text(art.to_colored_text())
+                else:
+                    output.write_text(art.to_plain_text())
+
             click.echo(f"✓ Saved to {output}", err=True)
 
         # Success message

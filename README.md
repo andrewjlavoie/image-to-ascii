@@ -6,7 +6,10 @@ Convert images to colorful ASCII art for backgrounds, terminals, and more.
 
 - **Multiple Output Formats**: Terminal (ANSI colors), image files (PNG/JPG), and JSON (for LLM processing)
 - **Rich Color Modes**: Black & white, source colors, rainbow, gradients, and solid colors
-- **Resolution Presets**: Quick shortcuts like `4k`, `1080p`, or custom dimensions
+- **Smart Resolution**: Auto-detects source image size, or specify exact output dimensions for wallpapers
+- **Flexible Scaling**: Scale by percentage (e.g., `--scale=0.1` for 10% size)
+- **Wallpaper Creation**: `--output-resolution=4k` creates exact 4K pixel output (not huge character grids!)
+- **Custom Character Sets**: Use any characters you want (e.g., `--custom-chars " !@?"`)
 - **Image Effects**: Brightness, contrast, invert, aspect ratio correction
 - **Customizable Borders**: Add decorative borders and padding
 - **Extended Character Set**: Fine detail with comprehensive ASCII character mapping
@@ -43,20 +46,26 @@ uv pip install -e ".[dev]"
 ### CLI
 
 ```bash
-# Basic usage - display in terminal
+# Basic usage - display in terminal (uses source image resolution)
 ascii-bg image.jpg
 
-# 4K resolution with rainbow colors
-ascii-bg image.jpg --resolution=4k --color-mode=rainbow
+# Scale down large images for viewing
+ascii-bg large-image.jpg --scale=0.1
 
-# Save as image file
-ascii-bg photo.png -r 1920x1080 --brightness=20 -o output.png
+# Create 4K wallpaper (output is exactly 3840×2160 pixels)
+ascii-bg photo.png --output-resolution=4k -o wallpaper.png
+
+# Custom character sets
+ascii-bg image.jpg --custom-chars " .!@#" -o output.png
+
+# Rainbow colors with scaling
+ascii-bg image.jpg --scale=0.2 --color-mode=rainbow -o rainbow.png
 
 # Custom gradient
 ascii-bg input.jpg --color-mode=gradient --gradient-colors=#FF0000,#0000FF,#00FF00
 
 # JSON output for LLM processing
-ascii-bg image.jpg --json -o output.json
+ascii-bg image.jpg -o output.json
 ```
 
 ### API
@@ -81,38 +90,98 @@ result.save_image("output.png")   # Rendered image
 result.save_json("output.json")   # For LLM processing
 ```
 
+## Common Use Cases
+
+### Creating Wallpapers
+
+```bash
+# 4K monitor wallpaper (3840×2160 pixels, ~8 MB)
+ascii-bg photo.jpg --output-resolution=4k -o wallpaper.png
+
+# 1080p wallpaper with source colors
+ascii-bg image.jpg --output-resolution=1080p --color-mode=source -o bg.png
+
+# Custom size with rainbow gradient
+ascii-bg photo.png --output-resolution=2560x1440 --color-mode=rainbow -o wall.png
+```
+
+### Terminal Viewing
+
+```bash
+# Auto-size to source (may be too large)
+ascii-bg image.jpg
+
+# Scale down for better viewing (recommended)
+ascii-bg large-image.jpg --scale=0.1
+
+# Tiny preview (5% of original)
+ascii-bg huge-photo.png --scale=0.05
+```
+
+### Custom Artistic Effects
+
+```bash
+# Only use exclamation marks and at symbols
+ascii-bg photo.jpg --custom-chars " !@" -o minimalist.png
+
+# Circles gradient
+ascii-bg image.jpg --custom-chars " .oO@" --scale=0.2 -o circles.png
+
+# Numbers only
+ascii-bg photo.png --custom-chars " 123456789" -o numbers.png
+```
+
+### Important Tips
+
+**For Wallpapers:**
+- ✓ Use `--output-resolution=4k` (creates 3840×2160 px, ~8 MB)
+- ✗ Don't use `-r 4k` alone (creates 4k character grid, ~600 MB!)
+
+**For Terminal:**
+- ✓ Use `--scale=0.1` for large images
+- Default (source resolution) works great for small images
+
+**For File Sizes:**
+- Small files: `--scale=0.1 --font-size=8`
+- Quality output: `--output-resolution=4k --font-size=10`
+
 ## CLI Options
 
 ```
 ascii-bg <image> [options]
 
-Resolution:
-  -r, --resolution      4k, 1080p, 720p, or custom WxH (default: 1920x1080)
+Resolution & Scaling:
+  -r, --resolution         Character grid: 4k, 1080p, or WxH (default: source image size)
+  --output-resolution      Output pixels for wallpapers: 4k, 1080p, or WxH
+  --scale                  Scale by percentage: 0.5 (50%), 0.1 (10%), etc.
+
+Character Sets:
+  --charset                Preset: simple, extended, block, minimal (default: extended)
+  --custom-chars           Custom characters from light to dark (e.g., " .!@#")
 
 Color Options:
-  --color-mode          black-white, source, rainbow, gradient, solid
-  --bg-color           Background color for solid mode
-  --text-color         Text color for solid mode
-  --gradient-colors    Comma-separated colors for gradient
-  --gradient-direction horizontal, vertical, diagonal
+  --color-mode             black-white, source, rainbow, gradient, solid
+  --bg-color               Background color for solid mode
+  --text-color             Text color for solid mode
+  --gradient-colors        Comma-separated colors for gradient
+  --gradient-direction     horizontal, vertical, diagonal
 
 Effects:
-  --brightness         -100 to 100 (default: 0)
-  --contrast           -100 to 100 (default: 0)
-  --invert             Invert character density
-  --no-aspect-correct  Disable aspect ratio correction
+  --brightness             -100 to 100 (default: 0)
+  --contrast               -100 to 100 (default: 0)
+  --invert                 Invert character density
+  --no-aspect-correct      Disable aspect ratio correction
 
 Border/Padding:
-  --border             none, simple, double, custom
-  --border-char        Custom border character
-  --padding            0-10 (default: 0)
+  --border                 none, simple (default: none)
+  --border-char            Custom border character (default: #)
+  --padding                0-10 (default: 0)
 
 Output:
-  -o, --output         Output file (PNG, JPG, or JSON)
-  --terminal           Display in terminal
-  --json               JSON format for LLM processing
-  --font-size          Font size for image output (default: 10)
-  --font-family        Font family (default: Courier)
+  -o, --output             Output file (PNG, JPG, JSON, or TXT)
+  --terminal               Display in terminal (default: enabled)
+  --font-size              Font size for image output: 4-72 (default: 10)
+  --font-family            Font family (default: DejaVuSansMono)
 ```
 
 ## Development

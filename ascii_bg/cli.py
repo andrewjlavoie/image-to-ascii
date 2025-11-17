@@ -7,6 +7,7 @@ import click
 
 from ascii_bg.core import AsciiConverter, ColorHandler, ColorMode, parse_color
 from ascii_bg.core.character_sets import CharacterSet
+from ascii_bg.core.image_processor import ImageProcessor
 
 
 @click.command()
@@ -14,9 +15,22 @@ from ascii_bg.core.character_sets import CharacterSet
 @click.option(
     "-r",
     "--resolution",
-    default="1920x1080",
-    help="Resolution: preset (4k, 1080p, etc.) or WIDTHxHEIGHT",
-    show_default=True,
+    default=None,
+    help="Character grid resolution: preset (4k, 1080p, etc.) or WIDTHxHEIGHT (default: source image resolution)",
+    show_default=False,
+)
+@click.option(
+    "--output-resolution",
+    default=None,
+    help="Output image pixel resolution for wallpapers (e.g., 4k, 1080p, 3840x2160). Calculates optimal character grid.",
+    show_default=False,
+)
+@click.option(
+    "--scale",
+    type=click.FloatRange(0.01, 2.0),
+    default=None,
+    help="Scale resolution by percentage (e.g., 0.5 for 50%, 0.25 for 25%)",
+    show_default=False,
 )
 @click.option(
     "--charset",
@@ -24,6 +38,11 @@ from ascii_bg.core.character_sets import CharacterSet
     default="extended",
     help="Character set to use",
     show_default=True,
+)
+@click.option(
+    "--custom-chars",
+    default=None,
+    help="Custom characters ordered from light to dark (e.g., ' .!?@' or '!@?')",
 )
 @click.option(
     "--brightness",
@@ -125,8 +144,11 @@ from ascii_bg.core.character_sets import CharacterSet
 @click.version_option(version="0.1.0", prog_name="ascii-bg")
 def main(
     image: Path,
-    resolution: str,
+    resolution: str | None,
+    output_resolution: str | None,
+    scale: float | None,
     charset: str,
+    custom_chars: str | None,
     brightness: int,
     contrast: int,
     invert: bool,
@@ -148,18 +170,32 @@ def main(
 
     \b
     Examples:
-        # Terminal output
+        # Terminal output (uses source image resolution by default)
         ascii-bg image.jpg
         ascii-bg photo.png --resolution=4k --brightness=20
+
+        # Create wallpapers with specific OUTPUT pixel dimensions
+        ascii-bg image.jpg --output-resolution=4k -o wallpaper.png       # 3840×2160px
+        ascii-bg photo.png --output-resolution=1080p -o bg.png           # 1920×1080px
+        ascii-bg input.jpg --output-resolution=2560x1440 -o output.png   # Custom size
+
+        # Scale down large images for terminal viewing
+        ascii-bg large-photo.png --scale=0.5    # 50% of original size
+        ascii-bg huge-image.jpg --scale=0.25    # 25% of original size
+
+        # Custom character sets
+        ascii-bg image.jpg --custom-chars " .!?@"         # Light to dark
+        ascii-bg photo.png --custom-chars "!@?" -o out.png  # Only 3 chars
+        ascii-bg input.jpg --custom-chars " .-=oO@" --scale=0.2
 
         # Color modes
         ascii-bg image.jpg --color-mode=rainbow --gradient-direction=diagonal
         ascii-bg photo.png --color-mode=gradient --gradient-colors=#FF0000,#00FF00,#0000FF
         ascii-bg input.jpg --color-mode=solid --text-color=cyan --bg-color=black
 
-        # Save as PNG/JPG
-        ascii-bg image.jpg -o output.png --font-size=12
-        ascii-bg photo.png --color-mode=rainbow -o output.jpg --font-family=Courier
+        # Wallpapers with colors and custom settings
+        ascii-bg photo.jpg --output-resolution=4k --color-mode=source -o wall.png
+        ascii-bg image.jpg --output-resolution=1080p --font-size=8 -o compact.png
 
         # Save as JSON (for LLM processing)
         ascii-bg image.jpg -o output.json
@@ -169,8 +205,67 @@ def main(
         ascii-bg photo.png --border=simple --border-char=* --padding=1
     """
     try:
+        # Handle output resolution (for wallpapers - specifies output pixels)
+        if output_resolution is not None:
+            # Parse desired output pixel dimensions
+            output_pixels = ImageProcessor.parse_resolution(output_resolution)
+            output_width_px, output_height_px = output_pixels
+
+            # Calculate character dimensions at given font size
+            # Based on actual rendering measurements:
+            # - Width: font_size * 0.6 pixels
+            # - Height: font_size * 0.35 pixels (after aspect correction)
+            # - Height without aspect correction: font_size * 0.7 pixels
+            char_width_px = font_size * 0.6
+            char_height_px = font_size * 0.35 if not no_aspect_correct else font_size * 0.7
+
+            # Calculate character grid needed to achieve output resolution
+            width = int(output_width_px / char_width_px)
+            height = int(output_height_px / char_height_px)
+
+            click.echo(
+                f"Creating {output_width_px}×{output_height_px}px wallpaper "
+                f"({width}×{height} char grid at {font_size}pt font)",
+                err=True,
+            )
+        # Handle resolution and scaling
+        elif resolution is None:
+            # Use source image dimensions
+            from PIL import Image
+
+            with Image.open(image) as img:
+                width, height = img.width, img.height
+        else:
+            # Parse the provided resolution
+            parsed_res = ImageProcessor.parse_resolution(resolution)
+            width, height = parsed_res
+
+        # Apply scale if provided (unless output_resolution was used)
+        if scale is not None and output_resolution is None:
+            width = int(width * scale)
+            height = int(height * scale)
+            click.echo(f"Scaling to {scale:.0%}: {width}x{height}", err=True)
+
+        # Convert to resolution string
+        resolution = f"{width}x{height}"
+
         # Create character set
-        char_set = CharacterSet.from_preset(charset)
+        if custom_chars is not None:
+            # Use custom characters
+            if len(custom_chars) < 2:
+                click.echo(
+                    "Error: Custom character set must have at least 2 characters",
+                    err=True,
+                )
+                sys.exit(1)
+            char_set = CharacterSet(custom_chars)
+            click.echo(
+                f"Using custom characters: '{custom_chars}' ({len(custom_chars)} chars)",
+                err=True,
+            )
+        else:
+            # Use preset
+            char_set = CharacterSet.from_preset(charset)
 
         # Create color handler
         mode = ColorMode(color_mode)

@@ -14,6 +14,79 @@ Convert images to colorful ASCII art for backgrounds, terminals, and more.
 - **Customizable Borders**: Add decorative borders and padding
 - **Extended Character Set**: Fine detail with comprehensive ASCII character mapping
 
+## Quick Start: 10 Wallpaper Workflows
+
+### 1. Standard 4K Monitor Wallpaper
+```bash
+ascii-bg photo.jpg --output-resolution=4k --color-mode=source -o wallpaper.png
+```
+Creates a 3840×2160px wallpaper preserving original image colors (~8 MB).
+
+### 2. 1080p HD Wallpaper
+```bash
+ascii-bg image.jpg --output-resolution=1080p --color-mode=source -o desktop.png
+```
+Perfect for 1920×1080 displays (~2 MB).
+
+### 3. Ultrawide Monitor (21:9)
+```bash
+ascii-bg landscape.jpg --output-resolution=3440x1440 --color-mode=source -o ultrawide.png
+```
+Custom resolution for 21:9 ultrawide displays (~5 MB).
+
+### 4. Dual Monitor Setup (Side by Side)
+```bash
+ascii-bg wide-photo.jpg --output-resolution=3840x1080 --color-mode=source -o dual-monitor.png
+```
+Spans two 1080p monitors horizontally (~4 MB).
+
+### 5. Rainbow Gradient 4K
+```bash
+ascii-bg photo.jpg --output-resolution=4k --color-mode=rainbow \
+  --gradient-direction=diagonal -o rainbow-wall.png
+```
+Vibrant rainbow diagonal gradient over ASCII art (~8 MB).
+
+### 6. Custom Color Gradient
+```bash
+ascii-bg sunset.jpg --output-resolution=4k --color-mode=gradient \
+  --gradient-colors=#FF6B35,#F7931E,#FDC830 --gradient-direction=vertical -o sunset-wall.png
+```
+Warm sunset-themed gradient (~8 MB).
+
+### 7. Minimalist High Contrast
+```bash
+ascii-bg portrait.jpg --output-resolution=1080p --custom-chars " .:-=#@" \
+  --contrast=50 --brightness=10 -o minimal.png
+```
+Clean, high-contrast minimalist aesthetic (~2 MB).
+
+### 8. Retro Computer Style
+```bash
+ascii-bg retro-pic.jpg --output-resolution=1080p --color-mode=solid \
+  --text-color=green --bg-color=black --charset=simple -o retro.png
+```
+Classic green-on-black terminal look (~1 MB).
+
+### 9. Compact File Size 4K
+```bash
+ascii-bg image.jpg --output-resolution=4k --font-size=8 \
+  --color-mode=source -o compact-4k.png
+```
+4K resolution with smaller font for reduced file size (~5 MB).
+
+### 10. Mobile Wallpaper (Portrait)
+```bash
+ascii-bg photo.jpg --output-resolution=1080x1920 --color-mode=source -o mobile.png
+```
+Portrait orientation for smartphones (~3 MB).
+
+### Pro Tips:
+- **Always use `--output-resolution`** for wallpapers (not `-r`)
+- **Add `--color-mode=source`** to preserve original photo colors
+- **Adjust `--font-size`** to control detail level and file size
+- **Use `--brightness` and `--contrast`** to fine-tune the look
+
 ## Installation
 
 Using UV (recommended):
